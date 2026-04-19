@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineMaster // Pro Movie Database</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --accent-color: #e50914; /* Rojo Cinema */
+            --bg-dark: #0f1014;
+            --card-bg: #1a1c23;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .navbar {
+            background: rgba(15, 16, 20, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #333;
+        }
+
+        /* Caja de búsqueda autodesplegable */
+        .search-box {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            background: #222;
+            border-radius: 20px;
+            transition: width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            overflow: hidden;
+            border: 1px solid #444;
+        }
+
+        .search-box:hover, .search-box.active {
+            width: 250px;
+        }
+
+        .search-box input {
+            position: absolute;
+            top: 0; left: 40px;
+            width: 180px; height: 100%;
+            background: none; border: none; outline: none;
+            color: white; font-size: 14px;
+        }
+
+        .search-btn {
+            position: absolute;
+            top: 0; left: 0;
+            width: 40px; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            background: none; border: none; color: #aaa;
+        }
+
+        /* Tarjetas Estilo Moderno */
+        .movie-card {
+            background: var(--card-bg);
+            border: none;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .movie-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .poster-wrapper {
+            position: relative;
+            aspect-ratio: 2/3;
+        }
+
+        .rating-badge {
+            position: absolute;
+            top: 10px; right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: #ffc107;
+            padding: 5px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 12px;
+            backdrop-filter: blur(4px);
+        }
+
+        .movie-info { padding: 15px; }
+        .movie-title { font-size: 1rem; font-weight: 700; margin-bottom: 5px; color: #eee; }
+        .movie-overview { font-size: 0.85rem; color: #999; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+        /* Paginación */
+        .pagination .page-link {
+            background: #222; border: 1px solid #444; color: #fff;
+        }
+
+        .pagination .page-item.active .page-link {
+            background: var(--accent-color); border-color: var(--accent-color);
+        }
+
+        .loader {
+            display: none; width: 50px; height: 50px;
+            border: 5px solid #333; border-top-color: var(--accent-color);
+            border-radius: 50%; animation: spin 1s infinite linear;
+            margin: 50px auto;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<nav class="navbar sticky-top">
+    <div class="container d-flex justify-content-between align-items-center">
+        <a href="#" class="navbar-brand text-danger fw-bold fs-3">CINEMASTER</a>
+        
+        <div class="search-box" id="searchBox">
+            <button class="search-btn"><i class="fas fa-search"></i></button>
+            <input type="text" id="searchInput" placeholder="Buscar película...">
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 id="sectionTitle">Populares ahora</h2>
+    </div>
+
+    <div class="loader" id="loader"></div>
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4" id="movieGrid">
+        </div>
+
+    <nav class="mt-5">
+        <ul class="pagination justify-content-center" id="pagination">
+            </ul>
+    </nav>
+</div>
+
+<script>
+    // IMPORTANTE: TMDB API KEY (Versión Pro Gratuita)
+    const API_KEY = '5a616781600f68153305b0b302c340a5';
+    const BASE_URL = 'https://api.themoviedb.org/3';
+    const IMG_URL = 'https://image.tmdb.org/t/p/w500';
+
+    let currentPage = 1;
+    let currentQuery = '';
+
+    const movieGrid = document.getElementById('movieGrid');
+    const searchInput = document.getElementById('searchInput');
+    const sectionTitle = document.getElementById('sectionTitle');
+    const loader = document.getElementById('loader');
+
+    async function fetchMovies(page = 1, query = '') {
+        const movieGrid = document.getElementById('movieGrid');
+        const loader = document.getElementById('loader');
+        loader.style.display = 'block';
+        movieGrid.innerHTML = '';
+
+        const MI_LLAVE = '04c35731a5ee918f014970082a0088b1'; 
+        let urlBase = "https://api.themoviedb.org/3";
+        let path = query ? "/search/movie" : "/movie/popular";
+        let urlfinal = urlBase + path + "?api_key=" + MI_LLAVE + "&language=es-MX&page=" + page;
+        
+        if(query) urlfinal += "&query=" + encodeURIComponent(query);
+
+        try {
+            const res = await fetch(urlfinal);
+            const data = await res.json();
+            displayMovies(data.results.slice(0, 12));
+            setupPagination(data.total_pages > 500 ? 500 : data.total_pages);
+        } catch (error) {
+            movieGrid.innerHTML = `<h4 class="text-danger text-center">Error: ${error.message}</h4>`;
+        } finally {
+            loader.style.display = 'none';
+        }
+    }
+
+    function displayMovies(movies) {
+        const movieGrid = document.getElementById('movieGrid');
+        movies.forEach(movie => {
+            const { title, poster_path, vote_average, overview } = movie;
+            const movieEl = document.createElement('div');
+            movieEl.className = 'col';
+            movieEl.innerHTML = `
+                <div class="movie-card shadow-sm h-100">
+                    <div class="poster-wrapper">
+                        <img src="${poster_path ? 'https://image.tmdb.org/t/p/w500' + poster_path : 'https://via.placeholder.com/500x750?text=No+Poster'}" class="w-100 h-100 object-fit-cover">
+                        <div class="rating-badge"><i class="fas fa-star text-warning"></i> ${vote_average.toFixed(1)}</div>
+                    </div>
+                    <div class="movie-info">
+                        <h5 class="movie-title text-truncate">${title}</h5>
+                        <p class="movie-overview">${overview || 'Sin descripción.'}</p>
+                    </div>
+                </div>`;
+            movieGrid.appendChild(movieEl);
+        });
+    }
+
+    function setupPagination(totalPages) {
+        const pagination = document.getElementById('pagination');
+        pagination.innerHTML = '';
+        const start = Math.max(1, currentPage - 2);
+        const end = Math.min(totalPages, start + 4);
+
+        for (let i = start; i <= end; i++) {
+            const li = document.createElement('li');
+            li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+            li.innerHTML = `<a class="page-link" href="#" onclick="changePage(${i})">${i}</a>`;
+            pagination.appendChild(li);
+        }
+    }
+
+    function changePage(page) {
+        currentPage = page;
+        fetchMovies(page, currentQuery);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    let debounceTimer;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            currentQuery = e.target.value;
+            currentPage = 1;
+            document.getElementById('sectionTitle').innerText = currentQuery ? `Resultados: ${currentQuery}` : "Populares ahora";
+            fetchMovies(1, currentQuery);
+        }, 500);
+    });
+
+    window.onload = () => fetchMovies();
+
+    // Iniciar
+    window.onload = () => fetchMovies();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
